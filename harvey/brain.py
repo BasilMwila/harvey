@@ -4,6 +4,8 @@ import asyncio
 import json
 import logging
 import re
+import shutil
+import sys
 import uuid
 from pathlib import Path
 
@@ -56,8 +58,13 @@ class Brain:
         ``agent``/``task`` label the call in the usage_events ledger so the
         dashboard can attribute tokens and cost to specific work.
         """
+        # Windows installs the CLI as claude.cmd, which a bare "claude" exec
+        # cannot find, and cmd.exe mangles a long multi-line prompt passed as
+        # an argument. There the prompt goes in on stdin instead.
+        via_stdin = sys.platform == "win32"
         cmd = [
-            "claude", "-p", prompt,
+            *([shutil.which("claude") or "claude", "-p"] if via_stdin
+              else ["claude", "-p", prompt]),
             # JSON output carries exact token/cost accounting per call.
             "--output-format", "json",
             "--dangerously-skip-permissions",
@@ -90,13 +97,16 @@ class Brain:
                     *cmd,
                     # DEVNULL: the CLI reads inherited stdin as prompt input,
                     # stealing the terminal (and any piped answers) from Harvey.
-                    stdin=asyncio.subprocess.DEVNULL,
+                    stdin=(asyncio.subprocess.PIPE if via_stdin
+                           else asyncio.subprocess.DEVNULL),
                     stdout=asyncio.subprocess.PIPE,
                     stderr=asyncio.subprocess.PIPE,
                 )
                 try:
                     stdout, stderr = await asyncio.wait_for(
-                        process.communicate(), timeout=timeout
+                        process.communicate(
+                            prompt.encode("utf-8") if via_stdin else None),
+                        timeout=timeout,
                     )
                 except asyncio.TimeoutError:
                     logger.error(f"Claude call timed out after {timeout:.0f}s. Killing process.")

@@ -496,6 +496,10 @@ class OpenStreetMap(DiscoveryProvider):
         "attorney": ['office=lawyer'],
         "contractor": ['craft=builder', 'office=construction_company'],
         "landscap": ['craft=gardener', 'shop=garden_centre'],
+        "hotel": ['tourism=hotel', 'tourism=motel'],
+        "lodge": ['tourism=hotel', 'tourism=guest_house', 'tourism=chalet'],
+        "guest house": ['tourism=guest_house', 'tourism=hostel'],
+        "apartment": ['tourism=apartment'],
     }
 
     def _tags(self, term: str) -> list[str]:
@@ -579,7 +583,8 @@ class OpenStreetMap(DiscoveryProvider):
                 address=" ".join(x for x in (tags.get("addr:housenumber"),
                                              tags.get("addr:street")) if x),
                 location=city or query.location,
-                category=tags.get("craft") or tags.get("shop") or tags.get("office") or "",
+                category=(tags.get("craft") or tags.get("shop") or tags.get("office")
+                          or tags.get("tourism") or ""),
                 has_website=bool(site),
                 external_id=f"osm:{el.get('type')}/{el.get('id')}",
                 source_url=f"https://www.openstreetmap.org/{el.get('type')}/{el.get('id')}",
